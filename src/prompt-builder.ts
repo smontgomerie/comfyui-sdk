@@ -230,12 +230,15 @@ export class PromptBuilder<I extends string, O extends string, T extends NodeDat
       const keys = key.split(".");
       let current = this.prompt as any;
       for (let i = 0; i < keys.length - 1; i++) {
+        if (keys[i] === "__proto__" || keys[i] === "constructor") continue;
         if (!current[keys[i]]) {
           current[keys[i]] = {}; // Alow to set value to undefined path
         }
         current = current[keys[i]];
       }
-      current[keys[keys.length - 1]] = valueToSet;
+      if (keys[keys.length - 1] !== "__proto__" && keys[keys.length - 1] !== "constructor") {
+        current[keys[keys.length - 1]] = valueToSet;
+      }
     }
     return this as Simplify<PromptBuilder<I, O, T>>;
   }
