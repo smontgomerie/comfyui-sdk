@@ -216,6 +216,9 @@ export class PromptBuilder<I extends string, O extends string, T extends NodeDat
    * @throws {Error} - If the key is not found.
    */
   inputRaw<V = string | number | undefined>(key: string, value: V, encodeOs?: OSType) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new Error(`Invalid key: ${key}`);
+    }
     if (value !== undefined) {
       let valueToSet = value;
       /**
