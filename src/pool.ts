@@ -279,6 +279,17 @@ export class ComfyPool extends EventTarget {
     client.on("execution_success", (ev) => {
       states.locked = false;
     });
+    client.on("execution_interrupted", (ev) => {
+      states.locked = false;
+      this.dispatchEvent(
+        new CustomEvent("execution_interrupted", {
+          detail: {
+            client,
+            clientIdx: index
+          }
+        })
+      );
+    });
     client.on("execution_error", (ev) => {
       states.locked = false;
       this.dispatchEvent(

@@ -109,6 +109,7 @@ export type TComfyPoolEventKey =
   | "reconnected"
   | "executing"
   | "executed"
+  | "execution_interrupted"
   | "execution_error"
   | "system_monitor";
 
@@ -136,6 +137,7 @@ export type TComfyPoolEventMap = {
   add_job: CustomEvent<{ jobIdx: number; weight: number }>;
   have_job: CustomEvent<{ client: ComfyApi; remain: number }>;
   idle: CustomEvent<{ client: ComfyApi }>;
+  execution_interrupted: CustomEvent<{ client: ComfyApi; clientIdx: number }>;
   executing: CustomEvent<{ client: ComfyApi; clientIdx: number }>;
   executed: CustomEvent<{ client: ComfyApi; clientIdx: number }>;
   execution_error: CustomEvent<{
