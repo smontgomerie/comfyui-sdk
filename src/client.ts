@@ -31,7 +31,9 @@ export class ComfyApi extends EventTarget {
   public apiHost: string;
   public osType: OSType;
   public isReady: boolean = false;
+  public lastActivity: number = Date.now();
 
+  private wsTimeout: number = 10000;
   private apiBase: string;
   private clientId: string | null;
   private socket: WebSocketClient | null = null;
@@ -119,6 +121,11 @@ export class ComfyApi extends EventTarget {
        * This will retry to connect to WebSocket on error.
        */
       forceWs?: boolean;
+      /**
+       * Timeout for WebSocket connection.
+       * Default is 10000ms.
+       */
+      wsTimeout?: number;
       credentials?: BasicCredentials | BearerTokenCredentials | CustomCredentials;
     }
   ) {
@@ -129,6 +136,9 @@ export class ComfyApi extends EventTarget {
     if (opts?.credentials) {
       this.credentials = opts?.credentials;
       this.testCredentials();
+    }
+    if (opts?.wsTimeout) {
+      this.wsTimeout = opts.wsTimeout;
     }
     this.log("constructor", "Initialized", {
       host,
@@ -813,17 +823,42 @@ export class ComfyApi extends EventTarget {
       });
   }
 
-  private async reconnectWs(opened: boolean) {
+  public async reconnectWs(opened: boolean) {
     if (opened) {
       this.dispatchEvent(new CustomEvent("disconnected"));
       this.dispatchEvent(new CustomEvent("reconnecting"));
     }
-    setTimeout(() => {
+
+    // Attempt reconnection with exponential backoff
+    let attempt = 0;
+
+    const tryReconnect = () => {
+      attempt++;
+      this.log("socket", `Reconnection attempt #${attempt}`);
+
       this.socket?.client.terminate();
       this.socket?.close();
       this.socket = null;
+
       this.createSocket(true);
-    }, 500);
+
+      // Check if the socket is reconnected within a certain timeout
+      setTimeout(
+        () => {
+          if (!this.socket?.client || this.socket.client.readyState !== WebSocket.OPEN) {
+            this.log("socket", "Reconnection failed, retrying...");
+            tryReconnect(); // Retry if not connected
+          }
+        },
+        Math.min(1000 * attempt, 10000)
+      ); // Exponential backoff up to 10 seconds
+    };
+
+    tryReconnect();
+  }
+
+  private resetLastActivity() {
+    this.lastActivity = Date.now();
   }
 
   /**
@@ -832,24 +867,24 @@ export class ComfyApi extends EventTarget {
    */
   private createSocket(isReconnect: boolean = false) {
     if (this.socket) {
+      this.log("socket", "Socket already exists, skipping creation.");
       return;
     }
     const headers = {
       ...this.getCredentialHeaders()
     };
     let opened = false;
-    let existingSession = "?clientId=" + this.clientId;
+    const existingSession = `?clientId=${this.clientId}`;
     this.socket = new WebSocketClient(
       `ws${this.apiHost.includes("https:") ? "s" : ""}://${this.apiBase}/ws${existingSession}`,
-      {
-        headers
-      }
+      { headers }
     );
     this.socket.client.onclose = () => {
       this.log("socket", "Socket closed -> Reconnecting");
       this.reconnectWs(opened);
     };
     this.socket.client.onopen = () => {
+      this.resetLastActivity();
       this.log("socket", "Socket opened");
       opened = true;
       if (isReconnect) {
@@ -859,6 +894,7 @@ export class ComfyApi extends EventTarget {
       }
     };
     this.socket.client.onmessage = (event) => {
+      this.resetLastActivity();
       try {
         if (event.data instanceof Buffer) {
           const buffer = event.data;
@@ -903,5 +939,15 @@ export class ComfyApi extends EventTarget {
     this.socket.client.onerror = (e) => {
       this.log("socket", "Socket error", e);
     };
+    if (!isReconnect) {
+      setInterval(() => {
+        if (!opened) return;
+        if (Date.now() - this.lastActivity > this.wsTimeout) {
+          this.log("socket", "Connection timed out, reconnecting...");
+          this.reconnectWs(false);
+          opened = false;
+        }
+      }, this.wsTimeout / 2);
+    }
   }
 }
