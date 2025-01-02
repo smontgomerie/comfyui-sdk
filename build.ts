@@ -48,3 +48,5 @@ const typedContent = generateDtsBundle([
 fs.writeFileSync("./build/index.d.ts", typedContent.join("\n"));
 console.log("TypeCompiling", "Done!");
 console.log("Build", `Build success, take ${Date.now() - start}ms`);
+
+console.log("Build", "Done!");
