@@ -18,7 +18,7 @@
     "url": "git+https://github.com/tctien342/comfyui-sdk.git"
   },
   "author": "tctien342",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/tctien342/comfyui-sdk/issues"
   },
