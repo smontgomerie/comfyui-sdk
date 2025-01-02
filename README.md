@@ -1,283 +1,414 @@
-# ComfyUI SDK
+# ✨ ComfyUI SDK ✨
 
-A powerful TypeScript SDK for ComfyUI that provides type-safe workflow management, multi-instance support, and real-time execution monitoring.
-
+[![NPM Version](https://img.shields.io/npm/v/@saintno/comfyui-sdk?style=flat-square)](https://www.npmjs.com/package/@saintno/comfyui-sdk)
+[![License](https://img.shields.io/npm/l/@saintno/comfyui-sdk?style=flat-square)](https://github.com/tctien342/comfyui-sdk/blob/main/LICENSE)
+![CI](https://github.com/tctien342/comfyui-sdk/actions/workflows/release.yml/badge.svg)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-yellow.svg)](https://www.buymeacoffee.com/tctien342)
 
-## Features
+A robust and meticulously crafted TypeScript SDK 🚀 for seamless interaction with the [ComfyUI](https://github.com/comfyanonymous/ComfyUI) API. This SDK significantly simplifies the complexities of building, executing, and managing ComfyUI workflows, all while providing real-time updates and supporting multiple instances. 🖼️
 
-- 🔥 **Type-safe Workflow Building**: Build and validate workflows at compile time
-- 🌐 **Multi-Instance Support**: Load balance across multiple ComfyUI instances
-- 🔄 **Real-time Monitoring**: WebSocket integration for live execution updates
-- 🛠️ **Extension Support**: Built-in support for ComfyUI-Manager and Crystools
-- 🔒 **Authentication Ready**: Basic, Bearer and Custom auth support for secure setups
+## 🧭 Table of Contents
 
-## Quick Start
+- [🌟 Key Features 🌟](#-key-features-)
+- [📦 Installation 📦](#-installation-)
+- [🚀 Getting Started 🚀](#-getting-started-)
+  - [🎬 Basic Usage](#-basic-usage)
+  - [🔄 Managing Multiple Instances with `ComfyPool`](#-managing-multiple-instances-with-comfypool)
+  - [🔑 Authentication](#-authentication)
+- [📚 API Reference 📚](#-api-reference-)
+  - [`ComfyApi`](#comfyapi)
+  - [`CallWrapper`](#callwrapper)
+  - [`PromptBuilder`](#promptbuilder)
+  - [`ComfyPool`](#comfypool)
+  - [🗂️ Enums](#-enums)
+  - [🗄️ Types](#-types)
+  - [🧩 Features](#-features)
+- [📂 Examples](#-examples)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
 
-## Table of Contents
+## 🌟 Key Features 🌟
 
-1. [Features](#features)
-2. [Installation](#installation)
-3. [Core Concepts](#core-concepts)
-4. [Basic Usage](#basic-usage)
-5. [Advanced Usage](#advanced-usage)
-6. [API Reference](#api-reference)
-7. [Configuration](#configuration)
-8. [Error Handling](#error-handling)
-9. [Best Practices](#best-practices)
-10. [Contributing](#contributing)
-11. [License](#license)
+- **💎 TypeScript Powered**: Enjoy a fully typed codebase, ensuring enhanced development, maintainability, and type safety. 🛡️
+- **🏗️ Workflow Builder**: Construct and manipulate intricate ComfyUI workflows effortlessly using a fluent, intuitive builder pattern. 🧩
+- **🤹 Multi-Instance Management**: Handle a pool of ComfyUI instances with ease, employing flexible queueing strategies for optimal resource utilization. 🌐
+- **⚡ Real-Time Updates**: Subscribe to WebSocket events for live progress tracking, image previews, and error notifications. 🔔
+- **🔑 Authentication Flexibility**: Supports Basic Auth, Bearer Token, and Custom Authentication Headers, catering to diverse security requirements. 🔒
+- **🔌 Extension Support**: Seamlessly integrate with ComfyUI Manager and leverage system monitoring through the ComfyUI-Crystools extension. 🛠️
+- **🔀 Flexible Node Bypassing**: Strategically bypass specific nodes in your workflows during generation, enabling advanced customization. ⏭️
+- **📚 Comprehensive Examples**: Includes practical examples for Text-to-Image (T2I), Image-to-Image (I2I), and complex multi-node workflows. 📝
+- **🚨 Robust Error Handling**: Provides detailed error messages to facilitate debugging and graceful handling of API failures. 🐛
+- **📝 Automatic Changelog**: Automatically generates a changelog with each release, utilizing `auto-changelog` for transparent version tracking. 🔄
 
-## Installation
-
-Install the package using npm:
-
-```bash
-npm install @saintno/comfyui-sdk
-```
-
-Or using bun:
+## 📦 Installation 📦
 
 ```bash
 bun add @saintno/comfyui-sdk
 ```
 
-## Core Concepts
+or
 
-- **ComfyApi**: The main client for interacting with a single ComfyUI instance.
-- **ComfyPool**: A manager for multiple ComfyUI instances, providing load balancing.
-- **PromptBuilder**: A utility for constructing workflows with type-safe inputs and outputs.
-- **CallWrapper**: A wrapper for API calls that provides comprehensive event handling and execution control.
-
-## Basic Usage
-
-### Setting up a ComfyApi instance
-
-```typescript
-import { ComfyApi } from "@saintno/comfyui-sdk";
-
-const api = new ComfyApi("http://localhost:8188", "client-id");
-api.on("log", (ev) => console.log(ev.detail)); // Debug logs
-await api
-  .init(
-    1000 // Retry 1000 times before giving up, default 10 [optional]
-    1000 // Retry every 1000ms, default 1000ms [optional]
-  ) // Initialize websocket
-  .waitForReady(); // Wait for the client to be ready
+```bash
+npm i @saintno/comfyui-sdk
 ```
 
-### Creating a PromptBuilder
+## 🚀 Getting Started 🚀
+
+### 🎬 Basic Usage
+
+Here's a simplified example to quickly get you started:
 
 ```typescript
-import { PromptBuilder } from "@saintno/comfyui-sdk";
-import workflowJson from "./workflow.json"; // Get from `Save (API Format)` or `Export (API Format)` from ComfyUI Web
+import { ComfyApi, CallWrapper, PromptBuilder, TSamplerName, TSchedulerName, seed } from "@saintno/comfyui-sdk";
+import ExampleTxt2ImgWorkflow from "./example-txt2img-workflow.json";
 
-const promptBuilder = new PromptBuilder(
-  workflowJson,
-  ["checkpoint", "positive", "negative", "seed", "steps"], // Input keys
-  ["images"] // Output keys
+const api = new ComfyApi("http://localhost:8189").init();
+const workflow = new PromptBuilder(
+  ExampleTxt2ImgWorkflow,
+  ["positive", "negative", "checkpoint", "seed", "batch", "step", "cfg", "sampler", "sheduler", "width", "height"],
+  ["images"]
 )
   .setInputNode("checkpoint", "4.inputs.ckpt_name")
-  .setInputNode("positive", "6.inputs.text")
-  .setInputNode("negative", "7.inputs.text")
   .setInputNode("seed", "3.inputs.seed")
-  .setInputNode("steps", "3.inputs.steps")
-  .setInputNode("size", ["7.inputs.width", "7.inputs.height"]) // Bind multiple values to a single key
-  .setOutputNode("images", "9");
-```
-
-### Executing a Workflow
-
-> To avoid ComfyUI's caching and ensure different results with each call, use unique `seed` values.
-
-```typescript
-import { CallWrapper } from "@saintno/comfyui-sdk";
-
-const workflow = promptBuilder
-  .input(
-    "checkpoint",
-    "SDXL/realvisxlV40_v40LightningBakedvae.safetensors",
-    /**
-     * Use the client's osType to encode the path
-     *
-     * For example, if the client's `osType` is "nt" (Windows), the path should be encoded as below
-     * "SDXL\\realvisxlV40_v40LightningBakedvae.safetensors"
-     */
-    api.osType // This is optional, but recommended it you want to support multiple platforms
-  )
-  .input("positive", "A beautiful landscape")
-  .input("negative", "blurry, text")
-  .input("seed", 42)
-  .input("steps", 20);
+  .setInputNode("batch", "5.inputs.batch_size")
+  .setInputNode("negative", "7.inputs.text")
+  .setInputNode("positive", "6.inputs.text")
+  .setInputNode("cfg", "3.inputs.cfg")
+  .setInputNode("sampler", "3.inputs.sampler_name")
+  .setInputNode("sheduler", "3.inputs.scheduler")
+  .setInputNode("step", "3.inputs.steps")
+  .setInputNode("width", "5.inputs.width")
+  .setInputNode("height", "5.inputs.height")
+  .setOutputNode("images", "9")
+  .input("checkpoint", "SDXL/realvisxlV40_v40LightningBakedvae.safetensors", api.osType)
+  .input("seed", seed())
+  .input("step", 6)
+  .input("cfg", 1)
+  .input<TSamplerName>("sampler", "dpmpp_2m_sde_gpu")
+  .input<TSchedulerName>("sheduler", "sgm_uniform")
+  .input("width", 1024)
+  .input("height", 1024)
+  .input("batch", 1)
+  .input("positive", "A picture of cute dog on the street");
 
 new CallWrapper(api, workflow)
-  .onStart((promptId) => console.log(`Task ${promptId} started`))
-  .onProgress((info, promptId) => console.log(`Task ${promptId} progress:`, info))
-  .onFinished((data, promptId) => console.log(`Task ${promptId} finished:`, data))
+  .onFinished((data) => console.log(data.images?.images.map((img: any) => api.getPathImage(img))))
   .run();
 ```
 
-You can use `api.getCheckpoints()` to get the list of available checkpoints.
+#### 🔍 Breakdown
+
+- Import essential components from the SDK.
+- Create and initialize the `ComfyApi` instance.
+- Use `PromptBuilder` to define the workflow structure and set input nodes.
+- Set specific input values, including the checkpoint path, seed, and prompt.
+- Execute the workflow and log the generated image URLs using the `CallWrapper`.
+
+### 🔄 Managing Multiple Instances with `ComfyPool`
 
 ```typescript
-const client = new ComfyApi("http://localhost:8188");
-await client.getCheckpoints().then(console.log);
-```
+import {
+  ComfyApi,
+  CallWrapper,
+  ComfyPool,
+  EQueueMode,
+  PromptBuilder,
+  seed,
+  TSamplerName,
+  TSchedulerName
+} from "@saintno/comfyui-sdk";
+import ExampleTxt2ImgWorkflow from "./example-txt2img-workflow.json";
 
-## Advanced Usage
-
-### ComfyUI Manager
-
-> Support interact with ComfyUI-Manager extesion, require [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager) to be installed in the ComfyUI instance.
-
-```typescript
-const api = new ComfyApi("http://localhost:8189").init();
-/**
- * Should wait for the client to be ready for checking supported extensions
- */
-await api.waitForReady();
-
-if (api.ext.manager.isSupported) {
-  /**
-   * Get the list of all extensions
-   */
-  await api.ext.manager.getExtensionList().then(console.log);
-  //More methods are available, check the `api.ext.manager` reference for more details
-}
-```
-
-### ComfyUI Crystools
-
-> Support listen event from ComfyUI-Crystools extension for tracking system resources, require [ComfyUI-Crystools](https://github.com/crystian/ComfyUI-Crystools) to be installed in the ComfyUI instance.
-
-```typescript
-const api = new ComfyApi("http://localhost:8189").init();
-/**
- * Should wait for the client to be ready for checking supported extensions
- */
-await api.waitForReady();
-
-if (api.ext.monitor.isSupported) {
-  /**
-   * Listen to the system monitor event
-   */
-  api.ext.monitor.on("system_monitor", (ev) => {
-    console.log(ev.detail);
-  });
-  /**
-   * Current monitoring data
-   */
-  console.log(api.ext.monitor.monitorData);
-}
-```
-
-### Connection Pooling
-
-```typescript
-import { ComfyPool, EQueueMode } from "@saintno/comfyui-sdk";
-
-const pool = new ComfyPool(
-  [new ComfyApi("http://localhost:8188", "node-1"), new ComfyApi("http://localhost:8189", "node-2")],
-  //   "PICK_ZERO", Picks the client which has zero queue remaining. This is the default mode. (For who using along with ComfyUI web interface)
-  //   "PICK_LOWEST", Picks the client which has the lowest queue remaining.
-  //   "PICK_ROUTINE", Picks the client in a round-robin manner.
+const ApiPool = new ComfyPool(
+  [new ComfyApi("http://localhost:8188"), new ComfyApi("http://localhost:8189")],
   EQueueMode.PICK_ZERO
-);
+)
+  .on("init", () => console.log("Pool in initializing"))
+  .on("add_job", (ev) => console.log("Job added at index", ev.detail.jobIdx, "weight:", ev.detail.weight))
+  .on("added", (ev) => console.log("Client added", ev.detail.clientIdx));
 
-pool.run(async (api, clientIdx) => {
-  // Your workflow execution logic here
+const generateFn = async (api: ComfyApi, clientIdx?: number) => {
+  const workflow = new PromptBuilder(
+    ExampleTxt2ImgWorkflow,
+    ["positive", "negative", "checkpoint", "seed", "batch", "step", "cfg", "sampler", "sheduler", "width", "height"],
+    ["images"]
+  )
+    .setInputNode("checkpoint", "4.inputs.ckpt_name")
+    .setInputNode("seed", "3.inputs.seed")
+    .setInputNode("batch", "5.inputs.batch_size")
+    .setInputNode("negative", "7.inputs.text")
+    .setInputNode("positive", "6.inputs.text")
+    .setInputNode("step", "3.inputs.steps")
+    .setInputNode("width", "5.inputs.width")
+    .setInputNode("height", "5.inputs.height")
+    .setInputNode("cfg", "3.inputs.cfg")
+    .setInputNode("sampler", "3.inputs.sampler_name")
+    .setInputNode("scheduler", "3.inputs.scheduler")
+    .setOutputNode("images", "9")
+    .input("checkpoint", "SDXL/realvisxlV40_v40LightningBakedvae.safetensors", api.osType)
+    .input("seed", seed())
+    .input("step", 6)
+    .input("width", 512)
+    .input("height", 512)
+    .input("batch", 2)
+    .input("cfg", 1)
+    .input<TSamplerName>("sampler", "dpmpp_2m_sde_gpu")
+    .input<TSchedulerName>("scheduler", "sgm_uniform")
+    .input("positive", "A close up picture of cute Cat")
+    .input("negative", "text, blurry, bad picture, nsfw");
+
+  return new Promise<string[]>((resolve) => {
+    new CallWrapper(api, workflow)
+      .onFinished((data) => {
+        const url = data.images?.images.map((img: any) => api.getPathImage(img));
+        resolve(url as string[]);
+      })
+      .run();
+  });
+};
+
+const jobA = ApiPool.batch(Array(5).fill(generateFn), 10).then((res) => {
+  console.log("Batch A done");
+  return res.flat();
 });
 
-// Or execute multiple jobs in parallel
-pool.batch([
-  (api) => executeWorkflow(api, params1),
-  (api) => executeWorkflow(api, params2)
-  // ...
-]);
+const jobB = ApiPool.batch(Array(5).fill(generateFn), 0).then((res) => {
+  console.log("Batch B done");
+  return res.flat();
+});
+
+console.log(await Promise.all([jobA, jobB]).then((res) => res.flat()));
 ```
 
-### Authentication
+#### 🔍 Breakdown
+
+- Create a `ComfyPool` with multiple `ComfyApi` instances.
+- Set up event listeners for pool initialization, job additions, and client connections.
+- Define an async function (`generateFn`) that creates a workflow, sets its inputs, and executes it with a `CallWrapper`.
+- Use `ApiPool.batch` to run multiple jobs and wait for all batches to complete.
+
+### 🔑 Authentication
 
 ```typescript
-const api = new ComfyApi("http://localhost:8188", "client-id", {
-  credentials: {
-    type: "basic", // Can be "basic", "bearer_token" and "custom"
-    username: "your-username",
-    password: "your-password"
-  }
-});
+import { ComfyApi, BasicCredentials, BearerTokenCredentials, CustomCredentials } from "@saintno/comfyui-sdk";
+
+// Basic Authentication
+const basicAuth = new ComfyApi("http://localhost:8189", "node-id", {
+  credentials: { type: "basic", username: "username", password: "password" } as BasicCredentials
+}).init();
+
+// Bearer Token Authentication
+const bearerAuth = new ComfyApi("http://localhost:8189", "node-id", {
+  credentials: { type: "bearer_token", token: "your_bearer_token" } as BearerTokenCredentials
+}).init();
+
+// Custom Header Authentication
+const customAuth = new ComfyApi("http://localhost:8189", "node-id", {
+  credentials: { type: "custom", headers: { "X-Custom-Header": "your_custom_header" } } as CustomCredentials
+}).init();
 ```
 
-## API Reference
+#### 🔍 Breakdown
 
-### ComfyApi
+- Import the necessary types from the SDK.
+- Create `ComfyApi` instances using the corresponding credential types: `BasicCredentials`, `BearerTokenCredentials`, and `CustomCredentials`..
 
-- `constructor(host: string, clientId?: string, opts?: { credentials?: BasicCredentials })`
-- `queuePrompt(number: number, workflow: object): Promise<QueuePromptResponse | false>`
-- `getQueue(): Promise<QueueResponse>`
-- `getHistories(maxItems?: number): Promise<HistoryResponse>`
-- `getSystemStats(): Promise<SystemStatsResponse>`
-- `uploadImage(file: Buffer | Blob, fileName: string, config?: { override?: boolean, subfolder?: string }): Promise<{ info: ImageInfo; url: string } | false>`
+## 📚 API Reference 📚
 
-### ComfyPool
+### `ComfyApi`
 
-- `constructor(clients: ComfyApi[], mode: EQueueMode = EQueueMode.PICK_ZERO)`
-- `run<T>(job: (client: ComfyApi, clientIdx?: number) => Promise<T>, weight?: number): Promise<T>`
-- `batch<T>(jobs: Array<(client: ComfyApi, clientIdx?: number) => Promise<T>>, weight?: number): Promise<T[]>`
+#### 🏗️ Constructor
 
-### PromptBuilder
+```typescript
+constructor(host: string, clientId: string, opts?: { forceWs?: boolean, wsTimeout?: number, credentials?: BasicCredentials | BearerTokenCredentials | CustomCredentials; })
+```
 
-- `constructor(prompt: T, inputKeys: I[], outputKeys: O[])`
-- `setInputNode(input: I, key: DeepKeys<T>): this`
-- `setOutputNode(output: O, key: DeepKeys<T>): this`
-- `input<V = string | number | undefined>(key: I, value: V): PromptBuilder<I, O, object>`
+- `host`: The base URL of your ComfyUI server.
+- `clientId`: A unique ID for WebSocket communication (optional). Defaults to a generated ID.
+- `opts`: Optional settings:
+  - `forceWs`: Boolean to force WebSocket usage.
+  - `wsTimeout`: Timeout for WebSocket connections (milliseconds).
+  - `credentials`: Optional authentication credentials.
 
-### CallWrapper
+#### ⚙️ Methods
 
-- `constructor(client: ComfyApi, workflow: T)`
-- `onPreview(fn: (ev: Blob, promptId?: string) => void): this`
-- `onPending(fn: (promptId?: string) => void): this`
-- `onStart(fn: (promptId?: string) => void): this`
-- `onFinished(fn: (data: Record<keyof T["mapOutputKeys"], any>, promptId?: string) => void): this`
-- `onFailed(fn: (err: Error, promptId?: string) => void): this`
-- `onProgress(fn: (info: NodeProgress, promptId?: string) => void): this`
-- `run(): Promise<Record<keyof T["mapOutputKeys"], any> | undefined | false>`
+- `init(maxTries?: number, delayTime?: number)`: Initializes the client and establishes connection.
+- `on<K extends keyof TComfyAPIEventMap>(type: K, callback: (event: TComfyAPIEventMap[K]) => void, options?: AddEventListenerOptions | boolean)`: Attach an event listener.
+- `off<K extends keyof TComfyAPIEventMap>(type: K, callback: (event: TComfyAPIEventMap[K]) => void, options?: EventListenerOptions | boolean)`: Detach an event listener.
+- `removeAllListeners()`: Detach all event listeners.
+- `fetchApi(route: string, options?: FetchOptions)`: Fetch data from the API endpoint.
+- `pollStatus(timeout?: number)`: Polls the ComfyUI server status.
+- `queuePrompt(number: number | null, workflow: object)`: Queues a prompt for processing.
+- `appendPrompt(workflow: object)`: Adds a prompt to the workflow queue.
+- `getQueue()`: Retrieves the current state of the queue.
+- `getHistories(maxItems?: number)`: Retrieves the prompt execution history.
+- `getHistory(promptId: string)`: Retrieves a specific history entry by ID.
+- `getSystemStats()`: Retrieves system and device statistics.
+- `getExtensions()`: Retrieves a list of installed extensions.
+- `getEmbeddings()`: Retrieves a list of available embeddings.
+- `getCheckpoints()`: Retrieves a list of available checkpoints.
+- `getLoras()`: Retrieves a list of available Loras.
+- `getSamplerInfo()`: Retrieves sampler and scheduler information.
+- `getNodeDefs(nodeName?: string)`: Retrieves node object definitions.
+- `getUserConfig()`: Get user configuration data.
+- `createUser(username: string)`: Create new user.
+- `getSettings()`: Get all setting values for the current user.
+- `getSetting(id: string)`: Get a specific setting for the current user.
+- `storeSettings(settings: Record<string, unknown>)`: Store setting for the current user.
+- `storeSetting(id: string, value: unknown)`: Store a specific setting for the current user.
+- `uploadImage(file: Buffer | Blob, fileName: string, config?: { override?: boolean; subfolder?: string })`: Uploads an image file.
+- `uploadMask(file: Buffer | Blob, originalRef: ImageInfo)`: Uploads a mask file.
+- `freeMemory(unloadModels: boolean, freeMemory: boolean)`: Frees memory by unloading models.
+- `getPathImage(imageInfo: ImageInfo)`: Returns the path to an image.
+- `getImage(imageInfo: ImageInfo)`: Returns the blob data of image.
+- `getUserData(file: string)`: Get a user data file.
+- `storeUserData(file: string, data: unknown, options?: RequestInit & { overwrite?: boolean, stringify?: boolean, throwOnError?: boolean })`: Store a user data file.
+- `deleteUserData(file: string)`: Delete a user data file.
+- `moveUserData(source: string, dest: string, options?: RequestInit & { overwrite?: boolean })`: Move a user data file.
+- `listUserData(dir: string, recurse?: boolean, split?: boolean)`: List a user data file.
+- `interrupt()`: Interrupts the execution of the running prompt.
+- `reconnectWs(opened?: boolean)`: Reconnects to the WebSocket server.
 
-## Configuration
+### `CallWrapper`
 
-The library supports various configuration options, including:
+#### 🏗️ Constructor
 
-- Setting up multiple ComfyUI instances
-- Configuring authentication credentials
-- Choosing execution modes for the connection pool
+```typescript
+constructor(client: ComfyApi, workflow: PromptBuilder<I, O, T>)
+```
 
-Refer to the individual class constructors for specific configuration options.
+- `client`: An instance of the `ComfyApi` client.
+- `workflow`: An instance of `PromptBuilder` defining the workflow.
 
-## Error Handling
+#### ⚙️ Methods
 
-The library provides comprehensive error handling through the event system. Use the `onFailed` method of `CallWrapper` to catch and handle errors during execution.
+- `onPreview(fn: (ev: Blob, promptId?: string) => void)`: Set callback for preview events.
+- `onPending(fn: (promptId?: string) => void)`: Set callback when job is queued.
+- `onStart(fn: (promptId?: string) => void)`: Set callback when the job is started.
+- `onOutput(fn: (key: keyof PromptBuilder<I, O, T>["mapOutputKeys"], data: any, promptId?: string) => void)`: Sets a callback for when an output node is executed.
+- `onFinished(fn: (data: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any>, promptId?: string) => void)`: Set callback when the job is finished.
+- `onFailed(fn: (err: Error, promptId?: string) => void)`: Set callback when the job failed.
+- `onProgress(fn: (info: NodeProgress, promptId?: string) => void)`: Set callback for progress updates.
+- `run()`: Executes the workflow.
 
-## Best Practices
+### `PromptBuilder`
 
-1. Always use `PromptBuilder` to ensure type safety when constructing workflows.
-2. Utilize `ComfyPool` for managing multiple ComfyUI instances to improve reliability and load distribution.
-3. Implement proper error handling using the provided event callbacks.
-4. Use `batch` method of `ComfyPool` for parallel execution of multiple workflows.
+#### 🏗️ Constructor
 
-## Contributing
+```typescript
+constructor(prompt: T, inputKeys: I[], outputKeys: O[])
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- `prompt`: The initial workflow data object.
+- `inputKeys`: An array of input node keys.
+- `outputKeys`: An array of output node keys.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+#### ⚙️ Methods
 
-## License
+- `clone()`: Creates a new `PromptBuilder` instance with the same configuration.
+- `bypass(node: keyof T | (keyof T)[]): PromptBuilder<I, O, T>`: Marks node(s) to be bypassed at generation.
+- `reinstate(node: keyof T | (keyof T)[]): PromptBuilder<I, O, T>`: Unmarks node(s) from bypass at generation.
+- `setInputNode(input: I, key: DeepKeys<T> | Array<DeepKeys<T>>)`: Sets input node path for a key.
+- `setRawInputNode(input: I, key: string | string[])`: Sets raw input node path for a key.
+- `appendInputNode(input: I, key: DeepKeys<T> | Array<DeepKeys<T>>)`: Appends a node to the input node path.
+- `appendRawInputNode(input: I, key: string | string[])`: Appends a node to the raw input node path.
+- `setOutputNode(output: O, key: DeepKeys<T>)`: Sets output node path for a key.
+- `setRawOutputNode(output: O, key: string)`: Sets raw output node path for a key.
+- `input<V = string | number | undefined>(key: I, value: V, encodeOs?: OSType)`: Sets an input value.
+- `inputRaw<V = string | number | undefined>(key: string, value: V, encodeOs?: OSType)`: Sets a raw input value with dynamic key.
+- `get workflow`: Retrieves the workflow object.
+- `get caller`: Retrieves current `PromptBuilder` object.
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+### `ComfyPool`
 
----
+#### 🏗️ Constructor
 
-This README provides a comprehensive overview of the ComfyUI API Client library, including detailed usage examples, API references, and best practices. It should give users a solid understanding of how to use and configure the library for their needs.
+```typescript
+constructor(clients: ComfyApi[], mode: EQueueMode = EQueueMode.PICK_ZERO)
+```
+
+- `clients`: Array of `ComfyApi` instances.
+- `mode`: The queue mode using `EQueueMode` enum values.
+
+#### ⚙️ Methods
+
+- `on<K extends keyof TComfyPoolEventMap>(type: K, callback: (event: TComfyPoolEventMap[K]) => void, options?: AddEventListenerOptions | boolean)`: Attach an event listener.
+- `off<K extends keyof TComfyPoolEventMap>(type: K, callback: (event: TComfyPoolEventMap[K]) => void, options?: EventListenerOptions | boolean)`: Detach an event listener.
+- `addClient(client: ComfyApi)`: Adds a new client to the pool.
+- `removeClient(client: ComfyApi)`: Removes a client from the pool.
+- `removeClientByIndex(index: number)`: Removes a client by index.
+- `changeMode(mode: EQueueMode)`: Changes the queue mode.
+- `pick(idx?: number)`: Picks a client by index.
+- `pickById(id: string)`: Picks a client by ID.
+- `run<T>(job: (client: ComfyApi, clientIdx?: number) => Promise<T>, weight?: number, clientFilter?: { includeIds?: string[]; excludeIds?: string[] })`: Run a job with priority on an available client.
+- `batch<T>(jobs: Array<(client: ComfyApi, clientIdx?: number) => Promise<T>>, weight?: number, clientFilter?: { includeIds?: string[]; excludeIds?: string[] })`: Run multiple jobs concurrently.
+
+### 🗂️ Enums
+
+- `EQueueMode`:
+  - `PICK_ZERO`: Selects the client with zero remaining queue.
+  - `PICK_LOWEST`: Selects the client with the lowest remaining queue.
+  - `PICK_ROUTINE`: Selects clients in a round-robin manner.
+
+### 🗄️ Types
+
+- `OSType`:
+  - `POSIX`: For Unix-like systems.
+  - `NT`: For Windows systems.
+  - `JAVA`: For Java virtual machine.
+- `TSamplerName`: A union type of all available sampler names.
+- `TSchedulerName`: A union type of all available scheduler names.
+
+### 🧩 Features
+
+- `ManagerFeature`: Provides methods to manage ComfyUI Manager Extension.
+
+  ```typescript
+  const api = new ComfyApi("http://localhost:8189").init();
+  await api.waitForReady();
+
+  if (api.ext.manager.isSupported) {
+    await api.ext.manager.getExtensionList().then(console.log);
+    // Check api.ext.manager for more methods
+  }
+  ```
+
+- `MonitoringFeature`: Provides methods to monitor system resources using ComfyUI-Crystools Extension.
+
+  ```typescript
+  const api = new ComfyApi("http://localhost:8189").init();
+  await api.waitForReady();
+
+  if (api.ext.monitor.isSupported) {
+    // For subscribing to system monitor events
+    api.ext.monitor.on("system_monitor", (ev) => {
+      console.log(ev.detail);
+    });
+
+    // For getting current monitor data
+    console.log(api.ext.monitor.monitorData);
+  }
+  ```
+
+> Note: Features require respective extensions ([ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager) and [ComfyUI-Crystools](https://github.com/crystian/ComfyUI-Crystools)) to be installed.
+
+## 📂 Examples
+
+The `examples` directory contains practical demonstrations of SDK usage:
+
+- `example-i2i.ts`: Demonstrates image-to-image generation.
+- `example-pool.ts`: Demonstrates how to manage multiple ComfyUI instances using `ComfyPool`.
+- `example-pool-basic-auth.ts`: Demonstrates how to use `ComfyPool` with HTTP Basic Authentication.
+- `example-t2i.ts`: Demonstrates text-to-image generation.
+- `example-t2i-upscaled.ts`: Demonstrates text-to-image generation with upscaling.
+- `example-img2img-workflow.json`: Example workflow for image-to-image.
+- `example-txt2img-workflow.json`: Example workflow for text-to-image.
+- `example-txt2img-upscaled-workflow.json`: Example workflow for text-to-image with upscaling.
+
+## 🤝 Contributing
+
+Contributions are always welcome! Feel free to submit pull requests or create issues for bug reports and feature enhancements. 🙏
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for more details. 📄
