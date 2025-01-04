@@ -761,7 +761,6 @@ export class ComfyApi extends EventTarget {
    * @returns The initialized client instance.
    */
   init(maxTries = 10, delayTime = 1000) {
-    this.createSocket();
     this.pingSuccess(maxTries, delayTime)
       .then(() => {
         /**
@@ -772,12 +771,15 @@ export class ComfyApi extends EventTarget {
          * Test features on initialization.
          */
         this.testFeatures();
+        /**
+         * Create WebSocket connection on initialization.
+         */
+        this.createSocket();
       })
       .catch((e) => {
         this.log("init", "Failed", e);
         this.dispatchEvent(new CustomEvent("connection_error", { detail: e }));
       });
-
     return this;
   }
 
@@ -823,8 +825,8 @@ export class ComfyApi extends EventTarget {
       });
   }
 
-  public async reconnectWs(opened: boolean) {
-    if (opened) {
+  public async reconnectWs(triggerEvent?: boolean) {
+    if (triggerEvent) {
       this.dispatchEvent(new CustomEvent("disconnected"));
       this.dispatchEvent(new CustomEvent("reconnecting"));
     }
@@ -866,6 +868,7 @@ export class ComfyApi extends EventTarget {
    * @param {boolean} isReconnect If the socket connection is a reconnect attempt.
    */
   private createSocket(isReconnect: boolean = false) {
+    let reconnecting = false;
     if (this.socket) {
       this.log("socket", "Socket already exists, skipping creation.");
       return;
@@ -873,20 +876,21 @@ export class ComfyApi extends EventTarget {
     const headers = {
       ...this.getCredentialHeaders()
     };
-    let opened = false;
     const existingSession = `?clientId=${this.clientId}`;
     this.socket = new WebSocketClient(
       `ws${this.apiHost.includes("https:") ? "s" : ""}://${this.apiBase}/ws${existingSession}`,
       { headers }
     );
     this.socket.client.onclose = () => {
+      if (reconnecting || isReconnect) return;
+      reconnecting = true;
       this.log("socket", "Socket closed -> Reconnecting");
-      this.reconnectWs(opened);
+      this.reconnectWs(true);
     };
     this.socket.client.onopen = () => {
       this.resetLastActivity();
+      reconnecting = false;
       this.log("socket", "Socket opened");
-      opened = true;
       if (isReconnect) {
         this.dispatchEvent(new CustomEvent("reconnected"));
       } else {
@@ -941,11 +945,11 @@ export class ComfyApi extends EventTarget {
     };
     if (!isReconnect) {
       setInterval(() => {
-        if (!opened) return;
+        if (reconnecting) return;
         if (Date.now() - this.lastActivity > this.wsTimeout) {
+          reconnecting = true;
           this.log("socket", "Connection timed out, reconnecting...");
-          this.reconnectWs(false);
-          opened = false;
+          this.reconnectWs(true);
         }
       }, this.wsTimeout / 2);
     }
