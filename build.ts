@@ -30,7 +30,7 @@ await Promise.all([
     format: "cjs",
     minify: true,
     outdir: "./build",
-    naming: "index.cjs.js",
+    naming: "index.cjs",
     sourcemap: "external",
     target: "node"
   })

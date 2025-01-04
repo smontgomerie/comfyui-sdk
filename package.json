@@ -8,7 +8,7 @@
   "exports": {
     ".": {
       "import": "./build/index.esm.js",
-      "require": "./build/index.cjs.js",
+      "require": "./build/index.cjs",
       "types": "./build/index.d.ts",
       "default": "./build/index.esm.js"
     }
