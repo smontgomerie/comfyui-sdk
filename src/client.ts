@@ -34,6 +34,8 @@ export class ComfyApi extends EventTarget {
   public lastActivity: number = Date.now();
 
   private wsTimeout: number = 10000;
+  private wsTimer: Timer | null = null;
+
   private apiBase: string;
   private clientId: string | null;
   private socket: WebSocketClient | null = null;
@@ -148,7 +150,11 @@ export class ComfyApi extends EventTarget {
     return this;
   }
 
+  /**
+   * Destroys the client instance.
+   */
   destroy() {
+    if (this.wsTimer) clearInterval(this.wsTimer);
     this.socket?.client.removeAllListeners();
     this.socket?.close();
     this.removeAllListeners();
@@ -944,7 +950,7 @@ export class ComfyApi extends EventTarget {
       this.log("socket", "Socket error", e);
     };
     if (!isReconnect) {
-      setInterval(() => {
+      this.wsTimer = setInterval(() => {
         if (reconnecting) return;
         if (Date.now() - this.lastActivity > this.wsTimeout) {
           reconnecting = true;
