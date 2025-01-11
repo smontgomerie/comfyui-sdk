@@ -65,6 +65,7 @@ export type TEventKey =
   | "reconnected"
   | "connected"
   | "log"
+  | "terminal"
   | "reconnecting"
   | "b_preview";
 
@@ -81,6 +82,7 @@ export type TComfyAPIEventMap = {
   reconnected: CustomEvent<null>;
   b_preview: CustomEvent<Blob>;
   log: CustomEvent<{ msg: string; data: any }>;
+  terminal: CustomEvent<{ m: string; t: string }>;
   execution_start: CustomEvent<TExecution>;
   executing: CustomEvent<TExecuting>;
   progress: CustomEvent<TProgress>;
@@ -102,6 +104,7 @@ export type TComfyPoolEventKey =
   | "add_job"
   | "have_job"
   | "idle"
+  | "terminal"
   | "ready"
   | "change_mode"
   | "connected"
@@ -125,6 +128,7 @@ export type TComfyPoolEventMap = {
     clientIdx: number;
     error: Error;
   }>;
+  terminal: CustomEvent<{ clientIdx: number; m: string; t: string }>;
   ready: CustomEvent<{ client: ComfyApi; clientIdx: number }>;
   auth_success: CustomEvent<{ client: ComfyApi; clientIdx: number }>;
   loading_client: CustomEvent<{ client: ComfyApi; clientIdx: number }>;

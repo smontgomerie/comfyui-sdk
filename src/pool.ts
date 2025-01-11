@@ -258,6 +258,16 @@ export class ComfyPool extends EventTarget {
         states.locked = false;
       }
     });
+    client.on("terminal", (ev) => {
+      this.dispatchEvent(
+        new CustomEvent("terminal", {
+          detail: {
+            clientIdx: index,
+            ...ev.detail
+          }
+        })
+      );
+    });
     client.on("disconnected", () => {
       states.online = false;
       states.locked = false;

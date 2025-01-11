@@ -31,6 +31,7 @@ export class ComfyApi extends EventTarget {
   public apiHost: string;
   public osType: OSType;
   public isReady: boolean = false;
+  public listenTerminal: boolean = false;
   public lastActivity: number = Date.now();
 
   private wsTimeout: number = 10000;
@@ -104,7 +105,7 @@ export class ComfyApi extends EventTarget {
    *
    * @returns An object containing the available features, where each feature is a key-value pair.
    */
-  get availabeFeatures() {
+  get availableFeatures() {
     return Object.keys(this.ext).reduce(
       (acc, key) => ({
         ...acc,
@@ -128,6 +129,10 @@ export class ComfyApi extends EventTarget {
        * Default is 10000ms.
        */
       wsTimeout?: number;
+      /**
+       * Listen to terminal logs from the server. Default (false)
+       */
+      listenTerminal?: boolean;
       credentials?: BasicCredentials | BearerTokenCredentials | CustomCredentials;
     }
   ) {
@@ -141,6 +146,9 @@ export class ComfyApi extends EventTarget {
     }
     if (opts?.wsTimeout) {
       this.wsTimeout = opts.wsTimeout;
+    }
+    if (opts?.listenTerminal) {
+      this.listenTerminal = opts.listenTerminal;
     }
     this.log("constructor", "Initialized", {
       host,
@@ -351,6 +359,37 @@ export class ComfyApi extends EventTarget {
   async getSystemStats(): Promise<SystemStatsResponse> {
     const response = await this.fetchApi("/system_stats");
     return response.json();
+  }
+
+  /**
+   * Retrieves the terminal logs from the server.
+   */
+  async getTerminalLogs(): Promise<{
+    entries: Array<{ t: string; m: string }>;
+    size: { cols: number; rows: number };
+  }> {
+    const response = await this.fetchApi("/internal/logs/raw");
+    return response.json();
+  }
+
+  /**
+   * Sets the terminal subscription status.
+   * Enable will subscribe to terminal logs from websocket.
+   */
+  async setTerminalSubscription(subscribe: boolean) {
+    // Set the terminal subscription status again if call again
+    this.listenTerminal = subscribe;
+    // Send the request to the server
+    await this.fetchApi("/internal/logs/subscribe", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        clientId: this.clientId,
+        enabled: subscribe
+      })
+    });
   }
 
   /**
@@ -781,6 +820,10 @@ export class ComfyApi extends EventTarget {
          * Create WebSocket connection on initialization.
          */
         this.createSocket();
+        /**
+         * Set terminal subscription on initialization.
+         */
+        this.setTerminalSubscription(this.listenTerminal);
       })
       .catch((e) => {
         this.log("init", "Failed", e);
@@ -934,7 +977,11 @@ export class ComfyApi extends EventTarget {
           const msg = JSON.parse(event.data);
           if (!msg.data || !msg.type) return;
           this.dispatchEvent(new CustomEvent("all", { detail: msg }));
-          this.dispatchEvent(new CustomEvent(msg.type, { detail: msg.data }));
+          if (msg.type === "logs") {
+            this.dispatchEvent(new CustomEvent("terminal", { detail: msg.data.entries?.[0] || null }));
+          } else {
+            this.dispatchEvent(new CustomEvent(msg.type, { detail: msg.data }));
+          }
           if (msg.data.sid) {
             this.clientId = msg.data.sid;
           }
