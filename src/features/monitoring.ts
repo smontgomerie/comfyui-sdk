@@ -1,4 +1,5 @@
 import { AbstractFeature } from "./abstract";
+import { FetchOptions } from "./manager";
 
 const SYSTEM_MONITOR_EXTENSION = encodeURIComponent("Primitive boolean [Crystools]");
 
@@ -37,6 +38,13 @@ export class MonitoringFeature extends AbstractFeature {
     return this.supported;
   }
 
+  private async fetchApi(path: string, options?: FetchOptions) {
+    if (!this.supported) {
+      return false;
+    }
+    return this.client.fetchApi(path, options);
+  }
+
   public on<K extends keyof TMonitorEventMap>(
     type: K,
     callback: (event: TMonitorEventMap[K]) => void,
@@ -64,6 +72,98 @@ export class MonitoringFeature extends AbstractFeature {
       return false;
     }
     return this.resources;
+  }
+
+  /**
+   * Sets the monitor configuration.
+   */
+  async setConfig(
+    config?: Partial<{
+      /**
+       * Refresh per second (Default 0.5)
+       */
+      rate: number;
+      /**
+       * Switch to enable/disable CPU monitoring
+       */
+      switchCPU: boolean;
+      /**
+       * Switch to enable/disable GPU monitoring
+       */
+      switchHDD: boolean;
+      /**
+       * Switch to enable/disable RAM monitoring
+       */
+      switchRAM: boolean;
+      /**
+       * Path of HDD to monitor HDD usage (use getHddList to get the pick-able list)
+       */
+      whichHDD: string;
+    }>
+  ) {
+    if (!this.supported) {
+      return false;
+    }
+    return this.fetchApi(`/api/crystools/monitor`, {
+      method: "PATCH",
+      body: JSON.stringify(config)
+    });
+  }
+
+  /**
+   * Switches the monitor on or off.
+   */
+  async switch(active: boolean) {
+    if (!this.supported) {
+      return false;
+    }
+    return this.fetchApi(`/api/crystools/monitor/switch`, {
+      method: "POST",
+      body: JSON.stringify({ monitor: active })
+    });
+  }
+
+  /**
+   * Gets the list of HDDs.
+   */
+  async getHddList(): Promise<null | Array<string>> {
+    if (!this.supported) {
+      return null;
+    }
+    const data = await this.fetchApi(`/api/crystools/monitor/HDD`);
+    if (data) {
+      return data.json();
+    }
+    return null;
+  }
+
+  /**
+   * Gets the list of GPUs.
+   */
+  async getGpuList(): Promise<null | Array<{ index: number; name: string }>> {
+    if (!this.supported) {
+      return null;
+    }
+    const data = await this.fetchApi(`/api/crystools/monitor/GPU`);
+    if (data) {
+      return data.json();
+    }
+    return null;
+  }
+
+  /**
+   * Config gpu monitoring
+   * @param index Index of the GPU
+   * @param config Configuration of monitoring, set to `true` to enable monitoring
+   */
+  async setGpuConfig(index: number, config: Partial<{ utilization: boolean; vram: boolean; temperature: boolean }>) {
+    if (!this.supported) {
+      return false;
+    }
+    return this.fetchApi(`/api/crystools/monitor/GPU/${index}`, {
+      method: "PATCH",
+      body: JSON.stringify(config)
+    });
   }
 
   private bind() {
