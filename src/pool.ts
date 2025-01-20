@@ -48,13 +48,34 @@ export class ComfyPool extends EventTarget {
 
   private mode: EQueueMode = EQueueMode.PICK_ZERO;
   private jobQueue: Array<JobItem> = [];
-
   private routineIdx: number = 0;
+  private listeners: {
+    event: keyof TComfyPoolEventMap;
+    options?: AddEventListenerOptions | boolean;
+    handler: (event: TComfyPoolEventMap[keyof TComfyPoolEventMap]) => void;
+  }[] = [];
+  private maxQueueSize: number = 1000;
 
-  constructor(clients: ComfyApi[], mode: EQueueMode = EQueueMode.PICK_ZERO) {
+  constructor(
+    clients: ComfyApi[],
+    /**
+     * The mode for picking clients from the queue. Defaults to "PICK_ZERO".
+     */
+    mode: EQueueMode = EQueueMode.PICK_ZERO,
+    opts?: {
+      /**
+       * The maximum size of the job queue. Defaults to 1000.
+       */
+      maxQueueSize?: number;
+    }
+  ) {
     super();
     this.mode = mode;
-    // Wait event binded before initializing the pool
+    if (opts?.maxQueueSize) {
+      this.maxQueueSize = opts.maxQueueSize;
+    }
+
+    // Wait for event listeners to be attached before initializing the pool
     delay(1).then(() => {
       this.dispatchEvent(new CustomEvent("init"));
       clients.forEach((client) => {
@@ -70,6 +91,7 @@ export class ComfyPool extends EventTarget {
     options?: AddEventListenerOptions | boolean
   ) {
     this.addEventListener(type, callback as any, options);
+    this.listeners.push({ event: type, handler: callback, options });
     return this;
   }
 
@@ -79,7 +101,18 @@ export class ComfyPool extends EventTarget {
     options?: EventListenerOptions | boolean
   ) {
     this.removeEventListener(type, callback as any, options);
+    this.listeners = this.listeners.filter((listener) => listener.event !== type && listener.handler !== callback);
     return this;
+  }
+
+  /**
+   * Removes all event listeners from the pool.
+   */
+  public removeAllListeners() {
+    this.listeners.forEach((listener) => {
+      this.removeEventListener(listener.event, listener.handler, listener.options);
+    });
+    this.listeners = [];
   }
 
   /**
@@ -100,6 +133,13 @@ export class ComfyPool extends EventTarget {
     this.dispatchEvent(new CustomEvent("added", { detail: { client, clientIdx: index } }));
   }
 
+  destroy() {
+    this.clients.forEach((client) => client.destroy());
+    this.clients = [];
+    this.clientStates = [];
+    this.removeAllListeners();
+  }
+
   /**
    * Removes a client from the pool.
    *
@@ -108,11 +148,7 @@ export class ComfyPool extends EventTarget {
    */
   removeClient(client: ComfyApi): void {
     const index = this.clients.indexOf(client);
-    if (index !== -1) {
-      this.clients.splice(index, 1);
-      this.clientStates.splice(index, 1);
-      this.dispatchEvent(new CustomEvent("removed", { detail: { client, clientIdx: index } }));
-    }
+    this.removeClientByIndex(index);
   }
 
   /**
@@ -125,6 +161,7 @@ export class ComfyPool extends EventTarget {
   removeClientByIndex(index: number): void {
     if (index >= 0 && index < this.clients.length) {
       const client = this.clients.splice(index, 1)[0];
+      client.destroy();
       this.clientStates.splice(index, 1);
       this.dispatchEvent(new CustomEvent("removed", { detail: { client, clientIdx: index } }));
     }
@@ -378,6 +415,9 @@ export class ComfyPool extends EventTarget {
       excludeIds?: string[];
     }
   ): Promise<void> {
+    if (this.jobQueue.length >= this.maxQueueSize) {
+      throw new Error("Job queue limit reached");
+    }
     const inputWeight = weight === undefined ? this.jobQueue.length : weight;
     const idx = this.pushJobByWeight({
       weight: inputWeight,
@@ -392,8 +432,14 @@ export class ComfyPool extends EventTarget {
     );
   }
 
-  private async getAvailableClient(includeIds?: string[], excludeIds?: string[]): Promise<ComfyApi> {
+  private async getAvailableClient(includeIds?: string[], excludeIds?: string[], timeout = -1): Promise<ComfyApi> {
+    let tries = 1;
+    const start = Date.now();
     while (true) {
+      if (timeout > 0 && Date.now() - start > timeout) {
+        throw new Error("Timeout waiting for an available client");
+      }
+      if (tries < 100) tries++;
       let index = -1;
       const acceptedClients = this.clientStates.filter((c) => {
         if (!c.online) return false;
@@ -426,19 +472,20 @@ export class ComfyPool extends EventTarget {
         const client = this.clients[trueIdx];
         return client;
       }
-      await delay(20);
+      await delay(Math.min(tries * 10));
     }
   }
 
   private async pickJob(): Promise<void> {
-    if (this.jobQueue.length === 0) {
-      await delay(100);
-      return this.pickJob();
+    while (true) {
+      if (this.jobQueue.length === 0) {
+        await delay(100);
+        continue;
+      }
+      const job = this.jobQueue.shift();
+      const client = await this.getAvailableClient(job?.includeClientIds, job?.excludeClientIds);
+      const clientIdx = this.clients.indexOf(client);
+      job?.fn?.(client, clientIdx);
     }
-    const job = this.jobQueue.shift();
-    const client = await this.getAvailableClient(job?.includeClientIds, job?.excludeClientIds);
-    const clientIdx = this.clients.indexOf(client);
-    job?.fn?.(client, clientIdx);
-    this.pickJob();
   }
 }

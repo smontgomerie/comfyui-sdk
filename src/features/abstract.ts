@@ -22,6 +22,8 @@ export abstract class AbstractFeature extends EventTarget {
     this.removeEventListener(type, callback as any, options);
   }
 
+  abstract destroy(): void;
+
   /**
    * Check if this feature is supported by the current client
    */

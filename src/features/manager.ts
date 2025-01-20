@@ -29,6 +29,10 @@ export class ManagerFeature extends AbstractFeature {
     return this.supported;
   }
 
+  public destroy(): void {
+    this.supported = false;
+  }
+
   private async fetchApi(path: string, options?: FetchOptions) {
     if (!this.supported) {
       return false;

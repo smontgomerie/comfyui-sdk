@@ -162,9 +162,20 @@ export class ComfyApi extends EventTarget {
    * Destroys the client instance.
    */
   destroy() {
+    this.log("destroy", "Destroying client...");
     if (this.wsTimer) clearInterval(this.wsTimer);
-    this.socket?.client.removeAllListeners();
+    if (this.socket?.client) {
+      this.socket.client.onclose = null;
+      this.socket.client.onerror = null;
+      this.socket.client.onmessage = null;
+      this.socket.client.onopen = null;
+      this.socket.client.close();
+    }
+    for (const ext in this.ext) {
+      this.ext[ext as keyof typeof this.ext].destroy();
+    }
     this.socket?.close();
+    this.log("destroy", "Client destroyed");
     this.removeAllListeners();
   }
 

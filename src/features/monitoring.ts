@@ -27,6 +27,11 @@ export type TMonitorEventMap = {
 
 export class MonitoringFeature extends AbstractFeature {
   private resources?: TMonitorEvent;
+  private listeners: {
+    event: keyof TMonitorEventMap;
+    options?: AddEventListenerOptions | boolean;
+    handler: (event: TMonitorEventMap[keyof TMonitorEventMap]) => void;
+  }[] = [];
   private binded = false;
 
   async checkSupported() {
@@ -36,6 +41,13 @@ export class MonitoringFeature extends AbstractFeature {
       this.bind();
     }
     return this.supported;
+  }
+
+  public destroy(): void {
+    this.listeners.forEach((listener) => {
+      this.off(listener.event, listener.handler, listener.options);
+    });
+    this.listeners = [];
   }
 
   private async fetchApi(path: string, options?: FetchOptions) {
@@ -51,6 +63,7 @@ export class MonitoringFeature extends AbstractFeature {
     options?: AddEventListenerOptions | boolean
   ) {
     this.addEventListener(type, callback as any, options);
+    this.listeners.push({ event: type, options, handler: callback });
     return () => this.off(type, callback);
   }
 
@@ -60,6 +73,7 @@ export class MonitoringFeature extends AbstractFeature {
     options?: EventListenerOptions | boolean
   ): void {
     this.removeEventListener(type, callback as any, options);
+    this.listeners = this.listeners.filter((listener) => listener.event !== type && listener.handler !== callback);
   }
 
   /**
