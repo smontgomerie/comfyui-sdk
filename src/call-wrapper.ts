@@ -22,13 +22,26 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
   private prompt: PromptBuilder<I, O, T>;
   private started = false;
   private promptId?: string;
-  private output: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> = {} as any;
+  private output: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> = {} as any;
 
   private onPreviewFn?: (ev: Blob, promptId?: string) => void;
   private onPendingFn?: (promptId?: string) => void;
   private onStartFn?: (promptId?: string) => void;
-  private onOutputFn?: (key: keyof PromptBuilder<I, string, T>["mapOutputKeys"], data: any, promptId?: string) => void;
-  private onFinishedFn?: (data: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any>, promptId?: string) => void;
+  private onOutputFn?: (
+    key: keyof PromptBuilder<I, string, T>["mapOutputKeys"] | "_raw",
+    data: any,
+    promptId?: string
+  ) => void;
+  private onFinishedFn?: (
+    data: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> & {
+      /**
+       * The raw output data from the workflow execution.
+       * Key is node_id, value is node output.
+       */
+      _raw?: Record<string, any>;
+    },
+    promptId?: string
+  ) => void;
   private onFailedFn?: (err: Error, promptId?: string) => void;
   private onProgressFn?: (info: NodeProgress, promptId?: string) => void;
 
@@ -95,7 +108,7 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
    * @param fn - The callback function to handle the output.
    * @returns The current instance of the class.
    */
-  onOutput(fn: (key: keyof PromptBuilder<I, O, T>["mapOutputKeys"], data: any, promptId?: string) => void) {
+  onOutput(fn: (key: keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", data: any, promptId?: string) => void) {
     this.onOutputFn = fn;
     return this;
   }
@@ -107,7 +120,18 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
    *             and an optional promptId parameter.
    * @returns The current instance of the CallWrapper.
    */
-  onFinished(fn: (data: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any>, promptId?: string) => void) {
+  onFinished(
+    fn: (
+      data: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> & {
+        /**
+         * The raw output data from the workflow execution.
+         * Key is node_id, value is node output.
+         */
+        _raw?: Record<string, any>;
+      },
+      promptId?: string
+    ) => void
+  ) {
     this.onFinishedFn = fn;
     return this;
   }
@@ -143,7 +167,7 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
    *          or `undefined` if the job is not found,
    *          or `false` if the job execution fails.
    */
-  async run(): Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | undefined | false> {
+  async run(): Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | undefined | false> {
     /**
      * Start the job execution.
      */
@@ -158,12 +182,11 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
       promptLoadTrigger = resolve;
     });
 
-    let jobDoneTrigger!: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | false) => void;
-    const jobDonePromise: Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | false> = new Promise(
-      (resolve) => {
+    let jobDoneTrigger!: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | false) => void;
+    const jobDonePromise: Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | false> =
+      new Promise((resolve) => {
         jobDoneTrigger = resolve;
-      }
-    );
+      });
 
     /**
      * Declare the function to check if the job is executing.
@@ -195,8 +218,9 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
     // race condition handling
     let wentMissing = false;
     let cachedOutputDone = false;
-    let cachedOutputPromise: Promise<false | Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | null> =
-      Promise.resolve(null);
+    let cachedOutputPromise: Promise<
+      false | Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | null
+    > = Promise.resolve(null);
 
     const statusHandler = async () => {
       const queue = await this.client.getQueue();
@@ -358,7 +382,7 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
 
   private async handleCachedOutput(
     promptId: string
-  ): Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | false | null> {
+  ): Promise<Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | false | null> {
     const hisData = await this.client.getHistory(promptId);
     if (hisData?.status?.completed) {
       const output = this.mapOutput(hisData.outputs);
@@ -372,14 +396,19 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
     return null;
   }
 
-  private mapOutput(outputNodes: any): Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> {
+  private mapOutput(outputNodes: any): Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> {
     const outputMapped = this.prompt.mapOutputKeys;
-    const output: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> = {} as any;
+    const output: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> = {} as any;
 
     for (const key in outputMapped) {
       const node = outputMapped[key];
       if (node) {
         output[key as keyof PromptBuilder<I, O, T>["mapOutputKeys"]] = outputNodes[node];
+      } else {
+        if (!output._raw) {
+          output._raw = {};
+        }
+        output._raw[key] = outputNodes[key];
       }
     }
 
@@ -388,7 +417,7 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
 
   private handleJobExecution(
     promptId: string,
-    jobDoneTrigger: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | false) => void
+    jobDoneTrigger: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | false) => void
   ): void {
     const reverseOutputMapped = this.reverseMapOutputKeys();
 
@@ -406,6 +435,10 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
         this.output[outputKey as keyof PromptBuilder<I, O, T>["mapOutputKeys"]] = ev.detail.output;
         this.onOutputFn?.(outputKey, ev.detail.output, this.promptId);
         remainingOutput--;
+      } else {
+        this.output._raw = this.output._raw || {};
+        this.output._raw[ev.detail.node as string] = ev.detail.output;
+        this.onOutputFn?.(ev.detail.node as string, ev.detail.output, this.promptId);
       }
 
       if (remainingOutput === 0) {
@@ -467,7 +500,7 @@ export class CallWrapper<I extends string, O extends string, T extends NodeData>
   private handleError(
     ev: CustomEvent,
     promptId: string,
-    resolve: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"], any> | false) => void
+    resolve: (value: Record<keyof PromptBuilder<I, O, T>["mapOutputKeys"] | "_raw", any> | false) => void
   ) {
     if (ev.detail.prompt_id !== promptId) return;
     this.onFailedFn?.(new CustomEventError(ev.detail.exception_type, { cause: ev.detail }), ev.detail.prompt_id);
