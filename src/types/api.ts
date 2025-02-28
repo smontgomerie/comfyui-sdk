@@ -182,3 +182,46 @@ export interface IInputStringConfig {
 export type TStringInput = ["STRING", IInputStringConfig];
 export type TBoolInput = ["BOOLEAN", { default: boolean; tooltip?: string }];
 export type TNumberInput = ["INT" | "FLOAT", IInputNumberConfig];
+
+/**
+ * Represents a model folder in the ComfyUI system
+ * @experimental API that may change in future versions
+ */
+export interface ModelFolder {
+  name: string;
+  folders: string[];
+}
+
+/**
+ * Represents a model file in the ComfyUI system
+ * @experimental API that may change in future versions
+ */
+export interface ModelFile {
+  name: string;
+  pathIndex: number;
+}
+
+/**
+ * Response format for model preview images
+ * @experimental API that may change in future versions
+ */
+export interface ModelPreviewResponse {
+  body: ArrayBuffer;
+  contentType: string;
+}
+
+/**
+ * Response format for a list of model files
+ * @experimental API that may change in future versions
+ */
+export interface ModelFileListResponse {
+  files: ModelFile[];
+}
+
+/**
+ * Response format for a list of model folders
+ * @experimental API that may change in future versions
+ */
+export interface ModelFoldersResponse {
+  folders: ModelFolder[];
+}

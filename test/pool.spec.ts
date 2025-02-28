@@ -34,6 +34,9 @@ describe("ComfyPool", () => {
           isSupported: false,
           on: jest.fn()
         }
+      },
+      destroy: () => {
+        console.log("destroyed");
       }
     } as unknown as ComfyApi;
 

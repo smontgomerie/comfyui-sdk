@@ -7,6 +7,9 @@ import {
   HistoryEntry,
   HistoryResponse,
   ImageInfo,
+  ModelFile,
+  ModelFolder,
+  ModelPreviewResponse,
   NodeDefsResponse,
   OSType,
   QueuePromptResponse,
@@ -1017,5 +1020,90 @@ export class ComfyApi extends EventTarget {
         }
       }, this.wsTimeout / 2);
     }
+  }
+
+  /**
+   * Retrieves a list of all available model folders.
+   * @experimental API that may change in future versions
+   * @returns A promise that resolves to an array of ModelFolder objects.
+   */
+  async getModelFolders(): Promise<ModelFolder[]> {
+    try {
+      const response = await this.fetchApi("/experiment/models");
+      if (!response.ok) {
+        this.log("getModelFolders", "Failed to fetch model folders", response);
+        throw new Error(`Failed to fetch model folders: ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    } catch (error) {
+      this.log("getModelFolders", "Error fetching model folders", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves a list of all model files in a specific folder.
+   * @experimental API that may change in future versions
+   * @param folder - The name of the model folder.
+   * @returns A promise that resolves to an array of ModelFile objects.
+   */
+  async getModelFiles(folder: string): Promise<ModelFile[]> {
+    try {
+      const response = await this.fetchApi(`/experiment/models/${encodeURIComponent(folder)}`);
+      if (!response.ok) {
+        this.log("getModelFiles", "Failed to fetch model files", { folder, response });
+        throw new Error(`Failed to fetch model files: ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    } catch (error) {
+      this.log("getModelFiles", "Error fetching model files", { folder, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves a preview image for a specific model file.
+   * @experimental API that may change in future versions
+   * @param folder - The name of the model folder.
+   * @param pathIndex - The index of the folder path where the file is stored.
+   * @param filename - The name of the model file.
+   * @returns A promise that resolves to a ModelPreviewResponse object containing the preview image data.
+   */
+  async getModelPreview(folder: string, pathIndex: number, filename: string): Promise<ModelPreviewResponse> {
+    try {
+      const response = await this.fetchApi(
+        `/experiment/models/preview/${encodeURIComponent(folder)}/${pathIndex}/${encodeURIComponent(filename)}`
+      );
+
+      if (!response.ok) {
+        this.log("getModelPreview", "Failed to fetch model preview", { folder, pathIndex, filename, response });
+        throw new Error(`Failed to fetch model preview: ${response.status} ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get("content-type") || "image/webp";
+      const body = await response.arrayBuffer();
+
+      return {
+        body,
+        contentType
+      };
+    } catch (error) {
+      this.log("getModelPreview", "Error fetching model preview", { folder, pathIndex, filename, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a URL for a model preview image.
+   * @experimental API that may change in future versions
+   * @param folder - The name of the model folder.
+   * @param pathIndex - The index of the folder path where the file is stored.
+   * @param filename - The name of the model file.
+   * @returns The URL string for the model preview.
+   */
+  getModelPreviewUrl(folder: string, pathIndex: number, filename: string): string {
+    return this.apiURL(
+      `/experiment/models/preview/${encodeURIComponent(folder)}/${pathIndex}/${encodeURIComponent(filename)}`
+    );
   }
 }
