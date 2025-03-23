@@ -24,7 +24,6 @@
   },
   "homepage": "https://github.com/tctien342/comfyui-sdk#readme",
   "devDependencies": {
-    "@types/bun": "^1.1.11",
     "@types/jest": "^29.5.12",
     "@types/node": "^22.2.0",
     "@types/ws": "^8.5.12",
@@ -48,6 +47,8 @@
     "comfyui-sdk"
   ],
   "dependencies": {
+    "bun": "^1.2.5",
+    "fetch-blob": "^4.0.0",
     "ws": "^8.18.0"
   },
   "scripts": {

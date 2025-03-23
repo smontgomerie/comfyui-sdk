@@ -49,4 +49,9 @@ export class WebSocketClient {
   public close() {
     this.socket.close();
   }
+
+  isOpen()
+  {
+    return this.socket.readyState !== WebSocketImpl.OPEN
+  }
 }

@@ -38,7 +38,7 @@ export class ComfyApi extends EventTarget {
   public lastActivity: number = Date.now();
 
   private wsTimeout: number = 10000;
-  private wsTimer: Timer | null = null;
+  private wsTimer: ReturnType<typeof setInterval> | null = null;
 
   private apiBase: string;
   private clientId: string | null;
@@ -566,11 +566,24 @@ export class ComfyApi extends EventTarget {
     }
   ): Promise<{ info: ImageInfo; url: string } | false> {
     const formData = new FormData();
+
     if (file instanceof Buffer) {
-      formData.append("image", new Blob([file]), fileName);
-    } else {
+      formData.append("image", new Blob([new Uint8Array(file)], { type: "application/octet-stream" }), fileName);
+    } else if (file instanceof ArrayBuffer) {
+      formData.append("image", new Blob([new Uint8Array(file)], { type: "application/octet-stream" }), fileName);
+    } else if (typeof file === "string") {
+      // If file is a path in Node.js, use fs.createReadStream
+      import("fs").then(fs => {
+        // formData.append("image", fs.createReadStream(file), fileName);
+        console.error("string not handled")
+      });
+    } else if (file instanceof Blob || file instanceof File) {
       formData.append("image", file, fileName);
+    } else {
+      throw new Error("Unsupported file type provided.");
     }
+
+
     formData.append("subfolder", config?.subfolder ?? "");
     formData.append("overwrite", config?.override?.toString() ?? "false");
 
@@ -610,9 +623,19 @@ export class ComfyApi extends EventTarget {
 
     // Append the image file to the form data
     if (file instanceof Buffer) {
-      formData.append("image", new Blob([file]), "mask.png");
-    } else {
+      formData.append("image", new Blob([new Uint8Array(file)], { type: "application/octet-stream" }), "mask.png");
+    } else if (file instanceof ArrayBuffer) {
+      formData.append("image", new Blob([new Uint8Array(file)], { type: "application/octet-stream" }), "mask.png");
+    } else if (typeof file === "string") {
+      // If file is a path in Node.js, use fs.createReadStream
+      import("fs").then(fs => {
+        // formData.append("image", fs.createReadStream(file), fileName);
+        console.error("string not handled")
+      });
+    } else if (file instanceof Blob || file instanceof File) {
       formData.append("image", file, "mask.png");
+    } else {
+      throw new Error("Unsupported file type provided.");
     }
 
     // Append the original reference as a JSON string
@@ -901,7 +924,7 @@ export class ComfyApi extends EventTarget {
       attempt++;
       this.log("socket", `Reconnection attempt #${attempt}`);
 
-      this.socket?.client.terminate();
+      // this.socket?.client.terminate();
       this.socket?.close();
       this.socket = null;
 
@@ -910,7 +933,8 @@ export class ComfyApi extends EventTarget {
       // Check if the socket is reconnected within a certain timeout
       setTimeout(
         () => {
-          if (!this.socket?.client || this.socket.client.readyState !== WebSocket.OPEN) {
+
+          if (!this.socket?.client || this.socket.isOpen()) {
             this.log("socket", "Reconnection failed, retrying...");
             tryReconnect(); // Retry if not connected
           }
